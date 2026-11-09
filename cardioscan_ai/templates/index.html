@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CardioScan AI — Análisis de ECG | Ing. María Fernanda Rivera Sanclemente</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base:    #0a0f1e;
+  --bg-card:    #0f172a;
+  --bg-panel:   #111827;
+  --border:     #1e293b;
+  --accent:     #06b6d4;
+  --accent2:    #6366f1;
+  --accent3:    #a78bfa;
+  --text:       #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim:   #94a3b8;
+  --success:    #22c55e;
+  --warn:       #f59e0b;
+  --danger:     #ef4444;
+  --critical:   #dc2626;
+  --radius:     12px;
+  --radius-sm:  8px;
+  --font-mono:  'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-base);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,15,30,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
+}
+
+.logo-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+}
+
+.logo span { color: var(--accent); }
+
+.header-badge {
+  font-size: 0.7rem; font-family: var(--font-mono);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 3px 8px; border-radius: 20px;
+}
+
+/* ── Operator name field ─────────────────────────────────────────── */
+.operator-field {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.operator-label {
+  font-size: 0.7rem; color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.operator-input {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  color: var(--text);
+  width: 180px;
+  transition: border-color 0.15s;
+}
+
+.operator-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.operator-input::placeholder { color: var(--text-muted); }
+
+.operator-saved-icon {
+  font-size: 0.7rem; color: var(--success);
+  opacity: 0; transition: opacity 0.3s;
+}
+
+.operator-saved-icon.show { opacity: 1; }
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+.main {
+  max-width: 1400px; margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+
+.card-header h3 {
+  font-size: 0.85rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.card-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.card-body { padding: 1.25rem; }
+
+/* ── Upload Zone ─────────────────────────────────────────────────── */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 2rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  background: rgba(6,182,212,0.02);
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(6,182,212,0.06);
+}
+
+.upload-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  width: 100%; height: 100%;
+}
+
+.upload-icon {
+  font-size: 2.5rem; margin-bottom: 0.75rem;
+  display: block;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.upload-zone h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+.upload-zone p  { font-size: 0.78rem; color: var(--text-muted); }
+.upload-formats {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  justify-content: center; margin-top: 0.75rem;
+}
+.fmt-tag {
+  font-size: 0.68rem; font-family: var(--font-mono);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 4px;
+  color: var(--accent);
+}
+
+.file-selected {
+  display: none;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(6,182,212,0.08);
+  border: 1px solid rgba(6,182,212,0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 0.6rem 1.2rem;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 0.83rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  width: 100%; justify-content: center;
+  margin-top: 0.9rem; padding: 0.75rem;
+}
+
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.75rem; }
+
+/* ── Demo buttons ────────────────────────────────────────────────── */
+.demo-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px; margin-top: 0.25rem;
+}
+
+.demo-btn {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: 0.73rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+  text-align: center;
+}
+.demo-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(6,182,212,0.06); }
+
+/* ── Metrics grid ────────────────────────────────────────────────── */
+.metrics-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.metric-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+}
+
+.metric-label {
+  font-size: 0.67rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  margin-bottom: 4px;
+}
+
+.metric-value {
+  font-size: 1.3rem; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+  line-height: 1;
+}
+
+.metric-unit { font-size: 0.65rem; color: var(--text-muted); margin-left: 2px; }
+
+/* ── Diagnosis banner ────────────────────────────────────────────── */
+.diagnosis-banner {
+  display: none;
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid;
+  position: relative; overflow: hidden;
+}
+
+.diagnosis-banner::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: currentColor; opacity: 0.06;
+}
+
+.diag-main {
+  display: flex; align-items: center; gap: 1rem;
+}
+
+.diag-icon {
+  font-size: 2.2rem; line-height: 1;
+  flex-shrink: 0;
+}
+
+.diag-info h2 {
+  font-size: 1.4rem; font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.diag-info p {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.diag-badge {
+  margin-left: auto; flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem; font-weight: 700;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+
+.confidence-bar-wrap {
+  margin-top: 0.85rem;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px; height: 4px; overflow: hidden;
+}
+
+.confidence-bar {
+  height: 100%; border-radius: 4px;
+  background: currentColor;
+  transition: width 0.8s ease;
+}
+
+/* ── Clinical notes ──────────────────────────────────────────────── */
+.notes-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 0.75rem;
+}
+
+.notes-list li {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 0.8rem; color: var(--text-dim);
+  padding: 6px 10px;
+  background: var(--bg-panel);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent);
+}
+
+/* ── Plots ───────────────────────────────────────────────────────── */
+.plots-grid {
+  display: flex; flex-direction: column; gap: 1.25rem;
+}
+
+.plot-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.plot-title {
+  font-size: 0.75rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+}
+
+.plot-card img {
+  width: 100%; display: block;
+  border-radius: 0;
+}
+
+.plots-2col {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────── */
+.loading-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(10,15,30,0.85);
+  backdrop-filter: blur(8px);
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 1.5rem;
+}
+
+.loading-overlay.active { display: flex; }
+
+.ecg-anim {
+  width: 220px; height: 60px;
+  position: relative; overflow: hidden;
+}
+
+.ecg-anim svg { width: 100%; height: 100%; }
+
+.ecg-line {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: ecg-draw 1.6s ease-in-out infinite;
+}
+
+@keyframes ecg-draw {
+  0%   { stroke-dashoffset: 600; }
+  100% { stroke-dashoffset: -600; }
+}
+
+.loading-text {
+  font-size: 0.85rem; color: var(--text-dim);
+  animation: fade-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes fade-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+.empty-state {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 4rem 2rem; text-align: center;
+  color: var(--text-muted);
+  gap: 0.75rem;
+}
+
+.empty-state .big-icon { font-size: 3.5rem; opacity: 0.3; }
+.empty-state h3 { font-size: 1rem; font-weight: 600; color: var(--text-dim); }
+.empty-state p  { font-size: 0.8rem; max-width: 280px; }
+
+/* ── Right column ────────────────────────────────────────────────── */
+.right-col {
+  display: flex; flex-direction: column; gap: 1.25rem;
+}
+
+/* ── Info section ────────────────────────────────────────────────── */
+.info-row {
+  display: flex; gap: 8px; font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+}
+.info-row span:first-child { color: var(--text-dim); font-weight: 500; min-width: 110px; }
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; }
+  .plots-2col { grid-template-columns: 1fr; }
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────── */
+[title] { cursor: help; }
+
+/* ── App Credits Footer ──────────────────────────────────────────── */
+.app-footer {
+  border-top: 1px solid var(--border);
+  padding: 1.5rem 2rem 2rem;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.app-footer p {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.app-footer .credit-name {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.app-footer .credit-role {
+  color: var(--accent);
+}
+.tab-strip {
+  display: flex; gap: 2px;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.73rem; font-weight: 600;
+  border: none; cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab-btn.active { background: rgba(6,182,212,0.12); color: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--text); }
+
+.plot-panel { display: none; padding: 0; }
+.plot-panel.active { display: block; }
+
+/* ── Report btn ──────────────────────────────────────────────────── */
+.actions-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🫀</div>
+    Cardio<span>Scan</span>&nbsp;AI
+  </div>
+  <div class="operator-field">
+    <label class="operator-label" for="operatorName">Operador / Paciente:</label>
+    <input type="text" id="operatorName" class="operator-input"
+           placeholder="Tu nombre" maxlength="60"
+           oninput="saveOperatorName()">
+    <span class="operator-saved-icon" id="operatorSavedIcon">✓ guardado</span>
+  </div>
+  <div class="header-badge">ECG · Espectrograma · ML</div>
+</header>
+
+<!-- ── Loading overlay ──────────────────────────────────────────────────── -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="ecg-anim">
+    <svg viewBox="0 0 220 60" xmlns="http://www.w3.org/2000/svg">
+      <path class="ecg-line"
+        d="M0,30 L30,30 L38,30 L42,10 L46,50 L50,20 L54,30 L80,30
+           L110,30 L118,30 L122,5 L126,55 L130,15 L134,30 L170,30
+           L200,30 L208,30 L212,8 L216,52 L220,30"/>
+    </svg>
+  </div>
+  <div class="loading-text" id="loadingText">Procesando señal ECG…</div>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- ── Left sidebar ──────────────────────────────────────────────────── -->
+  <aside>
+    <!-- Upload card -->
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-header">
+        <div class="card-dot"></div>
+        <h3>Cargar ECG</h3>
+      </div>
+      <div class="card-body">
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="ecgFile" accept=".csv,.txt,.wav,.npy,.dat">
+          <span class="upload-icon">📂</span>
+          <h4>Arrastra tu archivo ECG</h4>
+          <p>o haz clic para seleccionar</p>
+          <div class="upload-formats">
+            <span class="fmt-tag">.csv</span>
+            <span class="fmt-tag">.txt</span>
+            <span class="fmt-tag">.wav</span>
+            <span class="fmt-tag">.npy</span>
+            <span class="fmt-tag">.dat</span>
+          </div>
+        </div>
+        <div class="file-selected" id="fileSelected">📄 <span id="fileName"></span></div>
+        <button class="btn btn-primary" id="analyzeBtn" disabled onclick="analyzeFile()">
+          🔬 Analizar ECG
+        </button>
+      </div>
+    </div>
+
+    <!-- Demo card -->
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-header">
+        <div class="card-dot" style="background:var(--accent2)"></div>
+        <h3>Señales Demo</h3>
+      </div>
+      <div class="card-body">
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+          Prueba con ECGs sintéticos de distintas condiciones:
+        </p>
+        <div class="demo-grid">
+          <button class="demo-btn" onclick="loadDemo('normal')">✓ Normal</button>
+          <button class="demo-btn" onclick="loadDemo('tachy')">⚡ Taquicardia</button>
+          <button class="demo-btn" onclick="loadDemo('brady')">🔻 Bradicardia</button>
+          <button class="demo-btn" onclick="loadDemo('afib')">⚠ F. Auricular</button>
+          <button class="demo-btn" onclick="loadDemo('block')" style="grid-column:span 2">
+            🔒 Bloqueo AV
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metrics card -->
+    <div class="card" id="metricsCard" style="display:none">
+      <div class="card-header">
+        <div class="card-dot" style="background:var(--success)"></div>
+        <h3>Métricas HRV</h3>
+      </div>
+      <div class="card-body">
+        <div class="metrics-grid" id="metricsGrid"></div>
+
+        <div style="margin-top:1rem">
+          <div class="info-row"><span>Duración</span><span id="info-duration">—</span></div>
+          <div class="info-row"><span>Frecuencia muestreo</span><span id="info-fs">—</span></div>
+          <div class="info-row"><span>N.º muestras</span><span id="info-samples">—</span></div>
+        </div>
+
+        <div class="actions-row" style="margin-top:1rem" id="actionsRow"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Right column ──────────────────────────────────────────────────── -->
+  <div class="right-col">
+
+    <!-- Diagnosis banner -->
+    <div class="diagnosis-banner" id="diagnosisBanner">
+      <div class="diag-main">
+        <div class="diag-icon" id="diagIcon"></div>
+        <div class="diag-info">
+          <h2 id="diagName"></h2>
+          <p id="diagConf"></p>
+        </div>
+        <div class="diag-badge" id="diagRisk"></div>
+      </div>
+      <div class="confidence-bar-wrap">
+        <div class="confidence-bar" id="confidenceBar"></div>
+      </div>
+    </div>
+
+    <!-- Clinical notes -->
+    <div class="card" id="notesCard" style="display:none">
+      <div class="card-header">
+        <div class="card-dot" style="background:var(--warn)"></div>
+        <h3>Hallazgos Clínicos</h3>
+      </div>
+      <div class="card-body" style="padding-top:0.5rem">
+        <ul class="notes-list" id="notesList"></ul>
+        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:0.75rem">
+          ⚠ Este análisis es de apoyo diagnóstico y no reemplaza la evaluación de un médico cardiólogo.
+        </p>
+      </div>
+    </div>
+
+    <!-- Plots card -->
+    <div class="card" id="plotsCard">
+      <div class="tab-strip" id="tabStrip"></div>
+      <div id="plotPanels">
+        <div class="empty-state">
+          <span class="big-icon">📈</span>
+          <h3>Esperando análisis</h3>
+          <p>Carga un archivo ECG o selecciona una señal de demostración para comenzar.</p>
+        </div>
+      </div>
+    </div>
+
+    <p id="reportFooter" style="display:none;text-align:right;font-size:0.72rem;color:var(--text-muted);margin-top:0.5rem"></p>
+
+  </div>
+</main>
+
+<footer class="app-footer">
+  <p>
+    🫀 <span class="credit-role">CardioScan AI</span> · Clasificación de Enfermedades Cardiovasculares
+    mediante Espectrogramas Cardiacos con Machine Learning<br>
+    Diseñado y desarrollado por <span class="credit-name">Ing. María Fernanda Rivera Sanclemente</span><br>
+    UDI 2025 · Ficha de Desafío
+  </p>
+</footer>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let lastResult = null;
+let operatorName = '';
+
+// ── Nombre del operador / paciente ────────────────────────────────────────
+function saveOperatorName() {
+  operatorName = document.getElementById('operatorName').value.trim();
+  const icon = document.getElementById('operatorSavedIcon');
+  if (operatorName) {
+    icon.classList.add('show');
+    clearTimeout(window._opSaveTimeout);
+    window._opSaveTimeout = setTimeout(() => icon.classList.remove('show'), 1500);
+  } else {
+    icon.classList.remove('show');
+  }
+  updateReportFooter();
+}
+
+function updateReportFooter() {
+  const footer = document.getElementById('reportFooter');
+  if (!footer) return;
+  if (operatorName) {
+    footer.style.display = 'block';
+    footer.textContent = `Análisis realizado por: ${operatorName}  ·  ${new Date().toLocaleString('es-ES')}`;
+  } else {
+    footer.style.display = 'none';
+  }
+}
+
+// ── File upload ────────────────────────────────────────────────────────────
+const fileInput  = document.getElementById('ecgFile');
+const uploadZone = document.getElementById('uploadZone');
+const analyzeBtn = document.getElementById('analyzeBtn');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) {
+    const name = fileInput.files[0].name;
+    document.getElementById('fileName').textContent = name;
+    document.getElementById('fileSelected').style.display = 'block';
+    analyzeBtn.disabled = false;
+  }
+});
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    const dt = new DataTransfer(); dt.items.add(f); fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+
+// ── Analyze uploaded file ──────────────────────────────────────────────────
+async function analyzeFile() {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  await runAnalysis(() =>
+    fetch('/api/analyze', { method: 'POST', body: fd }).then(r => r.json())
+  );
+}
+
+// ── Load demo ──────────────────────────────────────────────────────────────
+async function loadDemo(condition) {
+  await runAnalysis(() =>
+    fetch(`/api/demo/${condition}`).then(r => r.json())
+  );
+}
+
+// ── Core pipeline ──────────────────────────────────────────────────────────
+const LOADING_MSGS = [
+  'Cargando señal ECG…',
+  'Aplicando filtros de preprocesamiento…',
+  'Calculando espectrograma STFT…',
+  'Extrayendo características HRV…',
+  'Clasificando con modelo ML…',
+  'Generando visualizaciones…',
+];
+
+async function runAnalysis(fetchFn) {
+  showLoading(true);
+  let msgIdx = 0;
+  const msgEl = document.getElementById('loadingText');
+  const msgTimer = setInterval(() => {
+    msgIdx = (msgIdx + 1) % LOADING_MSGS.length;
+    msgEl.textContent = LOADING_MSGS[msgIdx];
+  }, 900);
+
+  try {
+    const data = await fetchFn();
+    clearInterval(msgTimer);
+    showLoading(false);
+    if (data.status === 'ok') {
+      lastResult = data;
+      renderResult(data);
+    } else {
+      alert('Error: ' + (data.message || 'Error desconocido'));
+    }
+  } catch (err) {
+    clearInterval(msgTimer);
+    showLoading(false);
+    alert('Error de conexión: ' + err.message);
+  }
+}
+
+function showLoading(on) {
+  document.getElementById('loadingOverlay').classList.toggle('active', on);
+}
+
+// ── Render results ─────────────────────────────────────────────────────────
+const RISK_COLORS = { 'Bajo': '#22c55e', 'Medio': '#f59e0b', 'Alto': '#ef4444', 'Crítico': '#dc2626' };
+
+function renderResult(data) {
+  // Diagnosis banner
+  const banner = document.getElementById('diagnosisBanner');
+  banner.style.display = 'block';
+  banner.style.color   = data.color;
+  banner.style.borderColor = data.color + '55';
+
+  document.getElementById('diagIcon').textContent = data.icon;
+  document.getElementById('diagName').textContent = data.diagnosis;
+  document.getElementById('diagConf').textContent =
+    `Confianza: ${data.confidence}%  ·  ${data.signal_info.duration_sec}s de señal analizada`;
+  document.getElementById('diagRisk').textContent = `Riesgo ${data.risk}`;
+  document.getElementById('diagRisk').style.background = (RISK_COLORS[data.risk] || '#64748b') + '33';
+  document.getElementById('diagRisk').style.color = RISK_COLORS[data.risk] || '#64748b';
+
+  const bar = document.getElementById('confidenceBar');
+  bar.style.width = '0%';
+  setTimeout(() => { bar.style.width = data.confidence + '%'; }, 100);
+
+  // Clinical notes
+  const notesCard = document.getElementById('notesCard');
+  const notesList  = document.getElementById('notesList');
+  notesCard.style.display = 'block';
+  notesList.innerHTML = data.notes.map(n =>
+    `<li>🔹 ${n}</li>`
+  ).join('');
+
+  // Metrics
+  const f = data.features;
+  const metricsCard = document.getElementById('metricsCard');
+  metricsCard.style.display = 'block';
+
+  const metrics = [
+    { label: 'Frec. Cardíaca', value: (f.heart_rate||0).toFixed(0), unit: 'lpm' },
+    { label: 'SDNN',           value: (f.sdnn||0).toFixed(1),       unit: 'ms' },
+    { label: 'RMSSD',          value: (f.rmssd||0).toFixed(1),      unit: 'ms' },
+    { label: 'pNN50',          value: (f.pnn50||0).toFixed(1),      unit: '%' },
+    { label: 'Picos R',        value: f.num_peaks||0,               unit: '' },
+    { label: 'Razón LF/HF',   value: (f.lf_hf_ratio||0).toFixed(2),unit: '' },
+  ];
+
+  document.getElementById('metricsGrid').innerHTML = metrics.map(m => `
+    <div class="metric-card">
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-value">${m.value}<span class="metric-unit">${m.unit}</span></div>
+    </div>
+  `).join('');
+
+  const si = data.signal_info;
+  document.getElementById('info-duration').textContent = si.duration_sec + ' s';
+  document.getElementById('info-fs').textContent = si.fs_hz + ' Hz';
+  document.getElementById('info-samples').textContent = si.n_samples.toLocaleString();
+
+  // Actions
+  document.getElementById('actionsRow').innerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="exportReport()">📄 Exportar reporte</button>
+    <button class="btn btn-outline btn-sm" onclick="downloadScores()">📊 Scores JSON</button>
+  `;
+
+  // Plots
+  renderPlots(data.plots);
+
+  // Footer con nombre de operador
+  updateReportFooter();
+}
+
+function renderPlots(plots) {
+  const tabDefs = [
+    { id: 'ecg',          label: '🫀 Señal ECG' },
+    { id: 'spectrogram',  label: '🌈 Espectrograma' },
+    { id: 'rr',           label: '📈 RR / Poincaré' },
+    { id: 'psd',          label: '📡 Análisis Frecuencial' },
+    { id: 'scores',       label: '🎯 Probabilidades' },
+  ];
+
+  const tabStrip = document.getElementById('tabStrip');
+  const plotPanels = document.getElementById('plotPanels');
+
+  tabStrip.innerHTML = tabDefs.map((t, i) =>
+    `<button class="tab-btn ${i===0?'active':''}" onclick="switchTab('${t.id}',this)">${t.label}</button>`
+  ).join('');
+
+  plotPanels.innerHTML = tabDefs.map((t, i) => `
+    <div class="plot-panel ${i===0?'active':''}" id="panel-${t.id}">
+      <img src="data:image/png;base64,${plots[t.id]}"
+           alt="${t.label}" loading="lazy">
+    </div>
+  `).join('');
+}
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.plot-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + id).classList.add('active');
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────
+async function exportReport() {
+  if (!lastResult) return;
+  const payload = { ...lastResult, operator_name: operatorName };
+  const res = await fetch('/api/export_report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'reporte_ecg.txt';
+  a.click();
+}
+
+function downloadScores() {
+  if (!lastResult) return;
+  const blob = new Blob([JSON.stringify({
+    operator_name: operatorName || null,
+    generated_at: new Date().toISOString(),
+    diagnosis: lastResult.diagnosis,
+    confidence: lastResult.confidence,
+    risk: lastResult.risk,
+    scores: lastResult.scores,
+    features: lastResult.features,
+  }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ecg_scores.json';
+  a.click();
+}
+</script>
+</body>
+</html>

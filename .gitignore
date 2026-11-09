@@ -1,0 +1,14 @@
+# Artefactos de build / ejecutable (no versionar: el .exe supera el limite de 100MB de GitHub)
+build/
+dist/
+*.exe
+__pycache__/
+*.pyc
+*.pyo
+# Entornos virtuales
+.venv/
+venv/
+env/
+# Temporales del sistema
+.DS_Store
+Thumbs.db
